@@ -1,0 +1,16 @@
+{
+    "devices": {
+        "device:bmv2:1": {
+            "basic": {
+                "driver": "bmv2"
+            },
+            "bmv2": {
+                "runtimeAddress": "192.168.137.252:9559",
+                "pipelineConfig": {
+                    "type": "org.onosproject.org.foo.app",
+                    "basePath": "/home/vboxuser/testonosapp/foo-app/src/main/resources/"
+                }
+            }
+        }
+    }
+}
