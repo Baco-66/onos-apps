@@ -127,9 +127,10 @@ public class L2BridgingComponent {
      *
      * @param deviceId the device to set up
      */
-    //private void setUpDevice(DeviceId deviceId) {
+    private void setUpDevice(DeviceId deviceId) {
         //insertUnicastHostFLowRule(deviceId);
-    //}
+        insertDefaultBroadcastFlowRule(deviceId);
+    }
 
     /**
      * Inserts an ALL group in the ONOS core to replicate packets on all host
@@ -184,6 +185,48 @@ public class L2BridgingComponent {
     }
      */
 
+    /*
+     * Insert flow rule that matches all unmatched ethernet traffic. This
+     * will implement the traditional briding behavior that floods all
+     * unmatched traffic.
+     * <p>
+     * This method will be called at component activation for each device
+     * (switch) known by ONOS, and every time a new device-added event is
+     * captured by the InternalDeviceListener defined below.
+     *
+     * @param deviceId device ID where to install the rules
+     */
+
+    @SuppressWarnings("unused")
+    private void insertDefaultBroadcastFlowRule(DeviceId deviceId) {
+
+        log.info("Adding default rule on {}...", deviceId);
+
+        // Action: set multicast group id
+        final PiAction setDefaultAction = PiAction.builder()
+                .withId(PiActionId.of("IngressPipeImpl.add_switch_id"))
+                .withParameter(new PiActionParam(
+                        PiActionParamId.of("port_num"),
+                        1))
+                .withParameter(new PiActionParam(
+                        PiActionParamId.of("switch_id_value"),
+                        Utils.getUniqueSessionId(deviceId)))
+                .build();
+
+        //  Build flow rule.
+        final String tableId = "IngressPipeImpl.l2_exact_table";
+
+        /* Chaged the method used here because of an error "Invalid representation of 'don't care' ternary match"
+        In this github issue https://github.com/opennetworkinglab/ngsdn-tutorial/issues/93 the solution was to add this
+        Also hid the PiCriterion acordingly */
+
+        final FlowRule rule = Utils.buildFlowRuleDefaultAction(
+                deviceId, appId, tableId,
+                setDefaultAction);
+
+        // Insert rules.
+        flowRuleService.applyFlowRules(rule);
+    }
 
     /**
      * Insert flow rules matching ethernet destination
@@ -370,7 +413,7 @@ public class L2BridgingComponent {
                 mainComponent.getExecutorService().execute(() -> {
                     log.info("{} event! deviceId={}", event.type(), deviceId);
 
-                    //setUpDevice(deviceId);
+                    setUpDevice(deviceId);
                 });
             }
         }
@@ -473,7 +516,7 @@ public class L2BridgingComponent {
         deviceService.getAvailableDevices().forEach(device -> {
             if (mastershipService.isLocalMaster(device.id())) {
                 log.info("*** L2 BRIDGING - Starting initial set up for {}...", device.id());
-                //setUpDevice(device.id());
+                setUpDevice(device.id());
                 // For all hosts connected to this device...
                 hostService.getConnectedHosts(device.id()).forEach(
                         host -> learnHost(host, host.location().deviceId(),

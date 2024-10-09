@@ -19,7 +19,16 @@ tables {
   action_refs {
     id: 24677122
   }
-  const_default_action_id: 24677122
+  action_refs {
+    id: 23988038
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
   direct_resource_ids: 334804396
   size: 1024
 }
@@ -50,18 +59,6 @@ tables {
   match_fields {
     id: 4
     name: "hdr.ethernet.ether_type"
-    bitwidth: 16
-    match_type: TERNARY
-  }
-  match_fields {
-    id: 5
-    name: "local_metadata.l4_src_port"
-    bitwidth: 16
-    match_type: TERNARY
-  }
-  match_fields {
-    id: 6
-    name: "local_metadata.l4_dst_port"
     bitwidth: 16
     match_type: TERNARY
   }
@@ -111,6 +108,23 @@ actions {
 }
 actions {
   preamble {
+    id: 23988038
+    name: "IngressPipeImpl.add_switch_id"
+    alias: "add_switch_id"
+  }
+  params {
+    id: 1
+    name: "port_num"
+    bitwidth: 9
+  }
+  params {
+    id: 2
+    name: "switch_id_value"
+    bitwidth: 8
+  }
+}
+actions {
+  preamble {
     id: 30661427
     name: "IngressPipeImpl.send_to_cpu"
     alias: "send_to_cpu"
@@ -121,6 +135,11 @@ actions {
     id: 28447560
     name: "IngressPipeImpl.clone_to_cpu"
     alias: "clone_to_cpu"
+  }
+  params {
+    id: 1
+    name: "session_id"
+    bitwidth: 32
   }
 }
 direct_counters {

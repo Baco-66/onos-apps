@@ -4,9 +4,8 @@
       "name" : "scalars_0",
       "id" : 0,
       "fields" : [
-        ["local_metadata_t.l4_src_port", 16, false],
-        ["local_metadata_t.l4_dst_port", 16, false],
-        ["local_metadata_t.is_multicast", 1, false],
+        ["local_metadata_t.switch_id", 8, false],
+        ["local_metadata_t.host_port", 9, false],
         ["_padding_0", 7, false]
       ]
     },
@@ -57,6 +56,14 @@
         ["src_addr", 48, false],
         ["ether_type", 16, false]
       ]
+    },
+    {
+      "name" : "marquer_t",
+      "id" : 5,
+      "fields" : [
+        ["switch_id", 8, false],
+        ["ether_type", 16, false]
+      ]
     }
   ],
   "headers" : [
@@ -94,17 +101,58 @@
       "header_type" : "ethernet_t",
       "metadata" : false,
       "pi_omit" : true
+    },
+    {
+      "name" : "marquer[0]",
+      "id" : 5,
+      "header_type" : "marquer_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "marquer[1]",
+      "id" : 6,
+      "header_type" : "marquer_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "marquer[2]",
+      "id" : 7,
+      "header_type" : "marquer_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "marquer[3]",
+      "id" : 8,
+      "header_type" : "marquer_t",
+      "metadata" : false,
+      "pi_omit" : true
     }
   ],
-  "header_stacks" : [],
+  "header_stacks" : [
+    {
+      "name" : "marquer",
+      "id" : 0,
+      "header_type" : "marquer_t",
+      "size" : 4,
+      "header_ids" : [5, 6, 7, 8]
+    }
+  ],
   "header_union_types" : [],
   "header_unions" : [],
   "header_union_stacks" : [],
   "field_lists" : [
     {
       "id" : 1,
-      "name" : "empty",
-      "elements" : []
+      "name" : "field_list1",
+      "elements" : [
+        {
+          "type" : "field",
+          "value" : ["scalars", "local_metadata_t.host_port"]
+        }
+      ]
     }
   ],
   "errors" : [
@@ -188,6 +236,12 @@
           ],
           "transitions" : [
             {
+              "type" : "hexstr",
+              "value" : "0x9001",
+              "mask" : null,
+              "next_state" : "parse_marquer"
+            },
+            {
               "type" : "default",
               "value" : null,
               "mask" : null,
@@ -198,6 +252,41 @@
             {
               "type" : "field",
               "value" : ["ethernet", "ether_type"]
+            }
+          ]
+        },
+        {
+          "name" : "parse_marquer",
+          "id" : 3,
+          "parser_ops" : [
+            {
+              "parameters" : [
+                {
+                  "type" : "stack",
+                  "value" : "marquer"
+                }
+              ],
+              "op" : "extract"
+            }
+          ],
+          "transitions" : [
+            {
+              "type" : "hexstr",
+              "value" : "0x9001",
+              "mask" : null,
+              "next_state" : "parse_marquer"
+            },
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : null
+            }
+          ],
+          "transition_key" : [
+            {
+              "type" : "stack_field",
+              "value" : ["marquer", "ether_type"]
             }
           ]
         }
@@ -211,39 +300,39 @@
       "id" : 0,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 313,
+        "line" : 385,
         "column" : 8,
         "source_fragment" : "DeparserImpl"
       },
-      "order" : ["cpu_in", "ethernet"],
+      "order" : ["cpu_in", "ethernet", "marquer[0]", "marquer[1]", "marquer[2]", "marquer[3]"],
       "primitives" : []
     }
   ],
   "meter_arrays" : [],
   "counter_arrays" : [
     {
-      "name" : "l2_exact_table_counter",
+      "name" : "acl_table_counter",
       "id" : 0,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 176,
-        "column" : 8,
-        "source_fragment" : "counters"
-      },
-      "is_direct" : true,
-      "binding" : "IngressPipeImpl.l2_exact_table"
-    },
-    {
-      "name" : "acl_table_counter",
-      "id" : 1,
-      "source_info" : {
-        "filename" : "main.p4",
-        "line" : 243,
+        "line" : 234,
         "column" : 8,
         "source_fragment" : "counters"
       },
       "is_direct" : true,
       "binding" : "IngressPipeImpl.acl_table"
+    },
+    {
+      "name" : "l2_exact_table_counter",
+      "id" : 1,
+      "source_info" : {
+        "filename" : "main.p4",
+        "line" : 195,
+        "column" : 8,
+        "source_fragment" : "counters"
+      },
+      "is_direct" : true,
+      "binding" : "IngressPipeImpl.l2_exact_table"
     }
   ],
   "register_arrays" : [],
@@ -257,8 +346,14 @@
       "primitives" : []
     },
     {
-      "name" : "IngressPipeImpl.drop",
+      "name" : "NoAction",
       "id" : 1,
+      "runtime_data" : [],
+      "primitives" : []
+    },
+    {
+      "name" : "IngressPipeImpl.drop",
+      "id" : 2,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -271,7 +366,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 127,
+            "line" : 142,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -280,7 +375,7 @@
     },
     {
       "name" : "IngressPipeImpl.set_egress_port",
-      "id" : 2,
+      "id" : 3,
       "runtime_data" : [
         {
           "name" : "port_num",
@@ -302,7 +397,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 159,
+            "line" : 173,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port_num"
           }
@@ -310,8 +405,62 @@
       ]
     },
     {
+      "name" : "IngressPipeImpl.add_switch_id",
+      "id" : 4,
+      "runtime_data" : [
+        {
+          "name" : "port_num",
+          "bitwidth" : 9
+        },
+        {
+          "name" : "switch_id_value",
+          "bitwidth" : 8
+        }
+      ],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["standard_metadata", "egress_spec"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 0
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 173,
+            "column" : 8,
+            "source_fragment" : "standard_metadata.egress_spec = port_num; ..."
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "local_metadata_t.switch_id"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 1
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 178,
+            "column" : 8,
+            "source_fragment" : "local_metadata.switch_id = switch_id_value"
+          }
+        }
+      ]
+    },
+    {
       "name" : "IngressPipeImpl.send_to_cpu",
-      "id" : 3,
+      "id" : 5,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -328,7 +477,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 216,
+            "line" : 209,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = 200"
           }
@@ -337,15 +486,20 @@
     },
     {
       "name" : "IngressPipeImpl.clone_to_cpu",
-      "id" : 4,
-      "runtime_data" : [],
+      "id" : 6,
+      "runtime_data" : [
+        {
+          "name" : "session_id",
+          "bitwidth" : 32
+        }
+      ],
       "primitives" : [
         {
           "op" : "clone_ingress_pkt_to_egress",
           "parameters" : [
             {
-              "type" : "hexstr",
-              "value" : "0x00000063"
+              "type" : "runtime_data",
+              "value" : 0
             },
             {
               "type" : "hexstr",
@@ -354,16 +508,16 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 225,
+            "line" : 218,
             "column" : 5,
-            "source_fragment" : "clone_preserving_field_list(CloneType.I2E, 99, 0)"
+            "source_fragment" : "clone_preserving_field_list(CloneType.I2E, session_id, CLONE_TO_CONTROLLER)"
           }
         }
       ]
     },
     {
-      "name" : "main256",
-      "id" : 5,
+      "name" : "main261",
+      "id" : 7,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -380,7 +534,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 256,
+            "line" : 261,
             "column" : 12,
             "source_fragment" : "standard_metadata.egress_spec = hdr.cpu_out.egress_port"
           }
@@ -395,7 +549,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 257,
+            "line" : 264,
             "column" : 12,
             "source_fragment" : "hdr.cpu_out.setInvalid()"
           }
@@ -405,7 +559,7 @@
           "parameters" : [],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 258,
+            "line" : 267,
             "column" : 12,
             "source_fragment" : "exit"
           }
@@ -413,8 +567,543 @@
       ]
     },
     {
-      "name" : "main292",
-      "id" : 6,
+      "name" : "main256",
+      "id" : 8,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "local_metadata_t.host_port"]
+            },
+            {
+              "type" : "field",
+              "value" : ["standard_metadata", "ingress_port"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 256,
+            "column" : 8,
+            "source_fragment" : "local_metadata.host_port = standard_metadata.ingress_port"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main286",
+      "id" : 9,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "mark_to_drop",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "standard_metadata"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 286,
+            "column" : 16,
+            "source_fragment" : "mark_to_drop(standard_metadata)"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main290",
+      "id" : 10,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "add_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[0]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 290,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[0].setValid()"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[0]", "switch_id"]
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "local_metadata_t.switch_id"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 291,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[0].switch_id = local_metadata.switch_id"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[0]", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["ethernet", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 292,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[0].ether_type = hdr.ethernet.ether_type"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "ether_type"]
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x9001"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 293,
+            "column" : 20,
+            "source_fragment" : "hdr.ethernet.ether_type = 0x9001"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main296",
+      "id" : 11,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "add_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[1]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 296,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[1].setValid()"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[1]", "switch_id"]
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "local_metadata_t.switch_id"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 297,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[1].switch_id = local_metadata.switch_id"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[1]", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[0]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 298,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[1].ether_type = hdr.marquer[0].ether_type"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[0]", "ether_type"]
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x9001"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 299,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[0].ether_type = 0x9001"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main302",
+      "id" : 12,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "add_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[2]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 302,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[2].setValid()"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[2]", "switch_id"]
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "local_metadata_t.switch_id"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 303,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[2].switch_id = local_metadata.switch_id"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[2]", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[1]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 304,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[2].ether_type = hdr.marquer[1].ether_type"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[1]", "ether_type"]
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x9001"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 305,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[1].ether_type = 0x9001"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main308",
+      "id" : 13,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "add_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[3]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 308,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[3].setValid()"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[3]", "switch_id"]
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "local_metadata_t.switch_id"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 309,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[3].switch_id = local_metadata.switch_id"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[3]", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[2]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 310,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[3].ether_type = hdr.marquer[2].ether_type"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["marquer[2]", "ether_type"]
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x9001"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 311,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[2].ether_type = 0x9001"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main321",
+      "id" : 14,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[0]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 321,
+            "column" : 16,
+            "source_fragment" : "hdr.ethernet.ether_type = hdr.marquer[0].ether_type"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main324",
+      "id" : 15,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[1]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 324,
+            "column" : 16,
+            "source_fragment" : "hdr.ethernet.ether_type = hdr.marquer[1].ether_type"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main327",
+      "id" : 16,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[2]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 327,
+            "column" : 16,
+            "source_fragment" : "hdr.ethernet.ether_type = hdr.marquer[2].ether_type"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main330",
+      "id" : 17,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "ether_type"]
+            },
+            {
+              "type" : "field",
+              "value" : ["marquer[3]", "ether_type"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 330,
+            "column" : 16,
+            "source_fragment" : "hdr.ethernet.ether_type = hdr.marquer[3].ether_type"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main332",
+      "id" : 18,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "remove_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[0]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 332,
+            "column" : 12,
+            "source_fragment" : "hdr.marquer[0].setInvalid()"
+          }
+        },
+        {
+          "op" : "remove_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[1]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 333,
+            "column" : 12,
+            "source_fragment" : "hdr.marquer[1].setInvalid()"
+          }
+        },
+        {
+          "op" : "remove_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[2]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 334,
+            "column" : 12,
+            "source_fragment" : "hdr.marquer[2].setInvalid()"
+          }
+        },
+        {
+          "op" : "remove_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "marquer[3]"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 335,
+            "column" : 12,
+            "source_fragment" : "hdr.marquer[3].setInvalid()"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "main362",
+      "id" : 19,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -427,7 +1116,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 292,
+            "line" : 362,
             "column" : 12,
             "source_fragment" : "hdr.cpu_in.setValid()"
           }
@@ -446,7 +1135,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 293,
+            "line" : 363,
             "column" : 12,
             "source_fragment" : "hdr.cpu_in.ingress_port = standard_metadata.ingress_port"
           }
@@ -456,31 +1145,9 @@
           "parameters" : [],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 294,
+            "line" : 364,
             "column" : 12,
             "source_fragment" : "exit"
-          }
-        }
-      ]
-    },
-    {
-      "name" : "main302",
-      "id" : 7,
-      "runtime_data" : [],
-      "primitives" : [
-        {
-          "op" : "mark_to_drop",
-          "parameters" : [
-            {
-              "type" : "header",
-              "value" : "standard_metadata"
-            }
-          ],
-          "source_info" : {
-            "filename" : "main.p4",
-            "line" : 302,
-            "column" : 12,
-            "source_fragment" : "mark_to_drop(standard_metadata)"
           }
         }
       ]
@@ -492,11 +1159,11 @@
       "id" : 0,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 121,
+        "line" : 136,
         "column" : 8,
         "source_fragment" : "IngressPipeImpl"
       },
-      "init_table" : "node_2",
+      "init_table" : "tbl_main256",
       "tables" : [
         {
           "name" : "tbl_main256",
@@ -504,6 +1171,35 @@
           "source_info" : {
             "filename" : "main.p4",
             "line" : 256,
+            "column" : 33,
+            "source_fragment" : "="
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [8],
+          "actions" : ["main256"],
+          "base_default_next" : "node_3",
+          "next_tables" : {
+            "main256" : "node_3"
+          },
+          "default_entry" : {
+            "action_id" : 8,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main261",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 261,
             "column" : 42,
             "source_fragment" : "= hdr.cpu_out.egress_port; ..."
           },
@@ -514,52 +1210,16 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [5],
-          "actions" : ["main256"],
-          "base_default_next" : "IngressPipeImpl.l2_exact_table",
+          "action_ids" : [7],
+          "actions" : ["main261"],
+          "base_default_next" : "node_5",
           "next_tables" : {
-            "main256" : "IngressPipeImpl.l2_exact_table"
+            "main261" : "node_5"
           },
           "default_entry" : {
-            "action_id" : 5,
+            "action_id" : 7,
             "action_const" : true,
             "action_data" : [],
-            "action_entry_const" : true
-          }
-        },
-        {
-          "name" : "IngressPipeImpl.l2_exact_table",
-          "id" : 1,
-          "source_info" : {
-            "filename" : "main.p4",
-            "line" : 162,
-            "column" : 10,
-            "source_fragment" : "l2_exact_table"
-          },
-          "key" : [
-            {
-              "match_type" : "exact",
-              "name" : "hdr.ethernet.dst_addr",
-              "target" : ["ethernet", "dst_addr"],
-              "mask" : null
-            }
-          ],
-          "match_type" : "exact",
-          "type" : "simple",
-          "max_size" : 1024,
-          "with_counters" : true,
-          "support_timeout" : false,
-          "direct_meters" : null,
-          "action_ids" : [2],
-          "actions" : ["IngressPipeImpl.set_egress_port"],
-          "base_default_next" : "IngressPipeImpl.acl_table",
-          "next_tables" : {
-            "IngressPipeImpl.set_egress_port" : "IngressPipeImpl.acl_table"
-          },
-          "default_entry" : {
-            "action_id" : 2,
-            "action_const" : true,
-            "action_data" : ["0x1"],
             "action_entry_const" : true
           }
         },
@@ -568,7 +1228,7 @@
           "id" : 2,
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 228,
+            "line" : 221,
             "column" : 10,
             "source_fragment" : "acl_table"
           },
@@ -596,18 +1256,6 @@
               "name" : "hdr.ethernet.ether_type",
               "target" : ["ethernet", "ether_type"],
               "mask" : null
-            },
-            {
-              "match_type" : "ternary",
-              "name" : "local_metadata.l4_src_port",
-              "target" : ["scalars", "local_metadata_t.l4_src_port"],
-              "mask" : null
-            },
-            {
-              "match_type" : "ternary",
-              "name" : "local_metadata.l4_dst_port",
-              "target" : ["scalars", "local_metadata_t.l4_dst_port"],
-              "mask" : null
             }
           ],
           "match_type" : "ternary",
@@ -616,14 +1264,52 @@
           "with_counters" : true,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [3, 4, 1, 0],
+          "action_ids" : [5, 6, 2, 1],
           "actions" : ["IngressPipeImpl.send_to_cpu", "IngressPipeImpl.clone_to_cpu", "IngressPipeImpl.drop", "NoAction"],
-          "base_default_next" : null,
+          "base_default_next" : "IngressPipeImpl.l2_exact_table",
           "next_tables" : {
-            "IngressPipeImpl.send_to_cpu" : null,
-            "IngressPipeImpl.clone_to_cpu" : null,
-            "IngressPipeImpl.drop" : null,
-            "NoAction" : null
+            "IngressPipeImpl.send_to_cpu" : "IngressPipeImpl.l2_exact_table",
+            "IngressPipeImpl.clone_to_cpu" : "IngressPipeImpl.l2_exact_table",
+            "IngressPipeImpl.drop" : "IngressPipeImpl.l2_exact_table",
+            "NoAction" : "IngressPipeImpl.l2_exact_table"
+          },
+          "default_entry" : {
+            "action_id" : 1,
+            "action_const" : false,
+            "action_data" : [],
+            "action_entry_const" : false
+          }
+        },
+        {
+          "name" : "IngressPipeImpl.l2_exact_table",
+          "id" : 3,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 181,
+            "column" : 10,
+            "source_fragment" : "l2_exact_table"
+          },
+          "key" : [
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ethernet.dst_addr",
+              "target" : ["ethernet", "dst_addr"],
+              "mask" : null
+            }
+          ],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : true,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [3, 4, 0],
+          "actions" : ["IngressPipeImpl.set_egress_port", "IngressPipeImpl.add_switch_id", "NoAction"],
+          "base_default_next" : "node_8",
+          "next_tables" : {
+            "IngressPipeImpl.set_egress_port" : "node_8",
+            "IngressPipeImpl.add_switch_id" : "node_8",
+            "NoAction" : "node_8"
           },
           "default_entry" : {
             "action_id" : 0,
@@ -631,16 +1317,306 @@
             "action_data" : [],
             "action_entry_const" : false
           }
+        },
+        {
+          "name" : "tbl_main286",
+          "id" : 4,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 286,
+            "column" : 16,
+            "source_fragment" : "mark_to_drop(standard_metadata)"
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [9],
+          "actions" : ["main286"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "main286" : null
+          },
+          "default_entry" : {
+            "action_id" : 9,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main290",
+          "id" : 5,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 290,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[0].setValid(); ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [10],
+          "actions" : ["main290"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "main290" : null
+          },
+          "default_entry" : {
+            "action_id" : 10,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main296",
+          "id" : 6,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 296,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[1].setValid(); ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [11],
+          "actions" : ["main296"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "main296" : null
+          },
+          "default_entry" : {
+            "action_id" : 11,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main302",
+          "id" : 7,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 302,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[2].setValid(); ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [12],
+          "actions" : ["main302"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "main302" : null
+          },
+          "default_entry" : {
+            "action_id" : 12,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main308",
+          "id" : 8,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 308,
+            "column" : 20,
+            "source_fragment" : "hdr.marquer[3].setValid(); ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [13],
+          "actions" : ["main308"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "main308" : null
+          },
+          "default_entry" : {
+            "action_id" : 13,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main321",
+          "id" : 9,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 321,
+            "column" : 40,
+            "source_fragment" : "="
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [14],
+          "actions" : ["main321"],
+          "base_default_next" : "tbl_main332",
+          "next_tables" : {
+            "main321" : "tbl_main332"
+          },
+          "default_entry" : {
+            "action_id" : 14,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main324",
+          "id" : 10,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 324,
+            "column" : 40,
+            "source_fragment" : "="
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [15],
+          "actions" : ["main324"],
+          "base_default_next" : "tbl_main332",
+          "next_tables" : {
+            "main324" : "tbl_main332"
+          },
+          "default_entry" : {
+            "action_id" : 15,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main327",
+          "id" : 11,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 327,
+            "column" : 40,
+            "source_fragment" : "="
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [16],
+          "actions" : ["main327"],
+          "base_default_next" : "tbl_main332",
+          "next_tables" : {
+            "main327" : "tbl_main332"
+          },
+          "default_entry" : {
+            "action_id" : 16,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main330",
+          "id" : 12,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 330,
+            "column" : 40,
+            "source_fragment" : "="
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [17],
+          "actions" : ["main330"],
+          "base_default_next" : "tbl_main332",
+          "next_tables" : {
+            "main330" : "tbl_main332"
+          },
+          "default_entry" : {
+            "action_id" : 17,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_main332",
+          "id" : 13,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 332,
+            "column" : 12,
+            "source_fragment" : "hdr.marquer[0].setInvalid(); ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [18],
+          "actions" : ["main332"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "main332" : null
+          },
+          "default_entry" : {
+            "action_id" : 18,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
         }
       ],
       "action_profiles" : [],
       "conditionals" : [
         {
-          "name" : "node_2",
+          "name" : "node_3",
           "id" : 0,
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 248,
+            "line" : 258,
             "column" : 12,
             "source_fragment" : "hdr.cpu_out.isValid()"
           },
@@ -655,8 +1631,428 @@
               }
             }
           },
-          "true_next" : "tbl_main256",
+          "true_next" : "tbl_main261",
+          "false_next" : "node_5"
+        },
+        {
+          "name" : "node_5",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 273,
+            "column" : 12,
+            "source_fragment" : "standard_metadata.ingress_port != 1"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["standard_metadata", "ingress_port"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x0001"
+              }
+            }
+          },
+          "true_next" : "IngressPipeImpl.acl_table",
           "false_next" : "IngressPipeImpl.l2_exact_table"
+        },
+        {
+          "name" : "node_8",
+          "id" : 2,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 279,
+            "column" : 12,
+            "source_fragment" : "standard_metadata.egress_spec == 1"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "==",
+              "left" : {
+                "type" : "field",
+                "value" : ["standard_metadata", "egress_spec"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x0001"
+              }
+            }
+          },
+          "true_next" : "node_9",
+          "false_next" : "node_19"
+        },
+        {
+          "name" : "node_9",
+          "id" : 3,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 282,
+            "column" : 16,
+            "source_fragment" : "(hdr.marquer[0].isValid() && hdr.marquer[0].switch_id == local_metadata.switch_id) || ..."
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "or",
+              "left" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "or",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "or",
+                      "left" : {
+                        "type" : "expression",
+                        "value" : {
+                          "op" : "and",
+                          "left" : {
+                            "type" : "expression",
+                            "value" : {
+                              "op" : "d2b",
+                              "left" : null,
+                              "right" : {
+                                "type" : "field",
+                                "value" : ["marquer[0]", "$valid$"]
+                              }
+                            }
+                          },
+                          "right" : {
+                            "type" : "expression",
+                            "value" : {
+                              "op" : "==",
+                              "left" : {
+                                "type" : "field",
+                                "value" : ["marquer[0]", "switch_id"]
+                              },
+                              "right" : {
+                                "type" : "field",
+                                "value" : ["scalars", "local_metadata_t.switch_id"]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "right" : {
+                        "type" : "expression",
+                        "value" : {
+                          "op" : "and",
+                          "left" : {
+                            "type" : "expression",
+                            "value" : {
+                              "op" : "d2b",
+                              "left" : null,
+                              "right" : {
+                                "type" : "field",
+                                "value" : ["marquer[1]", "$valid$"]
+                              }
+                            }
+                          },
+                          "right" : {
+                            "type" : "expression",
+                            "value" : {
+                              "op" : "==",
+                              "left" : {
+                                "type" : "field",
+                                "value" : ["marquer[1]", "switch_id"]
+                              },
+                              "right" : {
+                                "type" : "field",
+                                "value" : ["scalars", "local_metadata_t.switch_id"]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "and",
+                      "left" : {
+                        "type" : "expression",
+                        "value" : {
+                          "op" : "d2b",
+                          "left" : null,
+                          "right" : {
+                            "type" : "field",
+                            "value" : ["marquer[2]", "$valid$"]
+                          }
+                        }
+                      },
+                      "right" : {
+                        "type" : "expression",
+                        "value" : {
+                          "op" : "==",
+                          "left" : {
+                            "type" : "field",
+                            "value" : ["marquer[2]", "switch_id"]
+                          },
+                          "right" : {
+                            "type" : "field",
+                            "value" : ["scalars", "local_metadata_t.switch_id"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "right" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "d2b",
+                  "left" : null,
+                  "right" : {
+                    "type" : "field",
+                    "value" : ["marquer[3]", "$valid$"]
+                  }
+                }
+              }
+            }
+          },
+          "true_next" : "tbl_main286",
+          "false_next" : "node_11"
+        },
+        {
+          "name" : "node_11",
+          "id" : 4,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 289,
+            "column" : 20,
+            "source_fragment" : "hdr.ethernet.ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["ethernet", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main290",
+          "false_next" : "node_13"
+        },
+        {
+          "name" : "node_13",
+          "id" : 5,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 295,
+            "column" : 25,
+            "source_fragment" : "hdr.marquer[0].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[0]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main296",
+          "false_next" : "node_15"
+        },
+        {
+          "name" : "node_15",
+          "id" : 6,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 301,
+            "column" : 25,
+            "source_fragment" : "hdr.marquer[1].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[1]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main302",
+          "false_next" : "node_17"
+        },
+        {
+          "name" : "node_17",
+          "id" : 7,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 307,
+            "column" : 25,
+            "source_fragment" : "hdr.marquer[2].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[2]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "false_next" : null,
+          "true_next" : "tbl_main308"
+        },
+        {
+          "name" : "node_19",
+          "id" : 8,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 318,
+            "column" : 16,
+            "source_fragment" : "hdr.ethernet.ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["ethernet", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "false_next" : "node_20",
+          "true_next" : "tbl_main332"
+        },
+        {
+          "name" : "node_20",
+          "id" : 9,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 320,
+            "column" : 21,
+            "source_fragment" : "hdr.marquer[0].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[0]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main321",
+          "false_next" : "node_22"
+        },
+        {
+          "name" : "node_22",
+          "id" : 10,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 323,
+            "column" : 21,
+            "source_fragment" : "hdr.marquer[1].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[1]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main324",
+          "false_next" : "node_24"
+        },
+        {
+          "name" : "node_24",
+          "id" : 11,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 326,
+            "column" : 21,
+            "source_fragment" : "hdr.marquer[2].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[2]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main327",
+          "false_next" : "node_26"
+        },
+        {
+          "name" : "node_26",
+          "id" : 12,
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 329,
+            "column" : 21,
+            "source_fragment" : "hdr.marquer[3].ether_type != 0x9001"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "!=",
+              "left" : {
+                "type" : "field",
+                "value" : ["marquer[3]", "ether_type"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x9001"
+              }
+            }
+          },
+          "true_next" : "tbl_main330",
+          "false_next" : "tbl_main332"
         }
       ]
     },
@@ -665,18 +2061,18 @@
       "id" : 1,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 278,
+        "line" : 348,
         "column" : 8,
         "source_fragment" : "EgressPipeImpl"
       },
-      "init_table" : "node_8",
+      "init_table" : "node_31",
       "tables" : [
         {
-          "name" : "tbl_main292",
-          "id" : 3,
+          "name" : "tbl_main362",
+          "id" : 14,
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 292,
+            "line" : 362,
             "column" : 12,
             "source_fragment" : "hdr.cpu_in.setValid(); ..."
           },
@@ -687,43 +2083,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [6],
-          "actions" : ["main292"],
-          "base_default_next" : "node_10",
-          "next_tables" : {
-            "main292" : "node_10"
-          },
-          "default_entry" : {
-            "action_id" : 6,
-            "action_const" : true,
-            "action_data" : [],
-            "action_entry_const" : true
-          }
-        },
-        {
-          "name" : "tbl_main302",
-          "id" : 4,
-          "source_info" : {
-            "filename" : "main.p4",
-            "line" : 302,
-            "column" : 12,
-            "source_fragment" : "mark_to_drop(standard_metadata)"
-          },
-          "key" : [],
-          "match_type" : "exact",
-          "type" : "simple",
-          "max_size" : 1024,
-          "with_counters" : false,
-          "support_timeout" : false,
-          "direct_meters" : null,
-          "action_ids" : [7],
-          "actions" : ["main302"],
+          "action_ids" : [19],
+          "actions" : ["main362"],
           "base_default_next" : null,
           "next_tables" : {
-            "main302" : null
+            "main362" : null
           },
           "default_entry" : {
-            "action_id" : 7,
+            "action_id" : 19,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -733,11 +2100,11 @@
       "action_profiles" : [],
       "conditionals" : [
         {
-          "name" : "node_8",
-          "id" : 1,
+          "name" : "node_31",
+          "id" : 13,
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 283,
+            "line" : 353,
             "column" : 12,
             "source_fragment" : "standard_metadata.egress_port == 200"
           },
@@ -755,51 +2122,8 @@
               }
             }
           },
-          "true_next" : "tbl_main292",
-          "false_next" : "node_10"
-        },
-        {
-          "name" : "node_10",
-          "id" : 2,
-          "source_info" : {
-            "filename" : "main.p4",
-            "line" : 301,
-            "column" : 12,
-            "source_fragment" : "local_metadata.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port"
-          },
-          "expression" : {
-            "type" : "expression",
-            "value" : {
-              "op" : "and",
-              "left" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "d2b",
-                  "left" : null,
-                  "right" : {
-                    "type" : "field",
-                    "value" : ["scalars", "local_metadata_t.is_multicast"]
-                  }
-                }
-              },
-              "right" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "==",
-                  "left" : {
-                    "type" : "field",
-                    "value" : ["standard_metadata", "ingress_port"]
-                  },
-                  "right" : {
-                    "type" : "field",
-                    "value" : ["standard_metadata", "egress_port"]
-                  }
-                }
-              }
-            }
-          },
           "false_next" : null,
-          "true_next" : "tbl_main302"
+          "true_next" : "tbl_main362"
         }
       ]
     }

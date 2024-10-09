@@ -24,20 +24,18 @@
 #define CPU_PORT 200 
 // Changed from 255 to 200 for fear of a bug
 
-// CPU_CLONE_SESSION_ID specifies the mirroring session for packets to be cloned
-// to the CPU port. Packets associated with this session ID will be cloned to
-// the CPU_PORT as well as being transmitted via their egress port (set by the
-// bridging/routing/acl table). For cloning to work, the P4Runtime controller
-// needs first to insert a CloneSessionEntry that maps this session ID to the
-// CPU_PORT.
-#define CPU_CLONE_SESSION_ID 99
+#define TYPE_BROADCAST 0x9001
 
 
+#define MAX_HOPS 4
+
+typedef bit<32>  session_id_t;
 typedef bit<9>   port_num_t;
 typedef bit<48>  mac_addr_t;
 typedef bit<16>  mcast_group_id_t;
-typedef bit<16>  l4_port_t;
+typedef bit<8>   switch_id_t;
 
+const bit<8> CLONE_TO_CONTROLLER = 1;
 
 
 //------------------------------------------------------------------------------
@@ -50,12 +48,18 @@ header ethernet_t {
     bit<16>     ether_type;
 }
 
+header marquer_t {
+    bit<8>      switch_id;
+    bit<16>     ether_type;
+}
+
 // Packet-in header. Prepended to packets sent to the CPU_PORT and used by the
 // P4Runtime server (Stratum) to populate the PacketIn message metadata fields.
 // Here we use it to carry the original ingress port where the packet was
 // received.
 @controller_header("packet_in")
 header cpu_in_header_t {
+    @field_list(CLONE_TO_CONTROLLER)
     port_num_t  ingress_port;
     bit<7>      _pad;
 }
@@ -71,15 +75,16 @@ header cpu_out_header_t {
 }
 
 struct parsed_headers_t {
-    cpu_out_header_t cpu_out;
-    cpu_in_header_t cpu_in;
-    ethernet_t ethernet;
+    cpu_out_header_t     cpu_out;
+    cpu_in_header_t      cpu_in;
+    ethernet_t           ethernet;
+    marquer_t[MAX_HOPS]  marquer;
 }
 
 struct local_metadata_t {
-    l4_port_t   l4_src_port;
-    l4_port_t   l4_dst_port;
-    bool        is_multicast;
+    switch_id_t switch_id;
+    //@field_list(CLONE_TO_CONTROLLER)
+    //port_num_t  host_port;
 }
 
 
@@ -91,6 +96,7 @@ parser ParserImpl (packet_in packet,
                    out parsed_headers_t hdr,
                    inout local_metadata_t local_metadata,
                    inout standard_metadata_t standard_metadata) {
+
     state start {
         transition select(standard_metadata.ingress_port) {
             CPU_PORT: parse_packet_out;
@@ -106,9 +112,19 @@ parser ParserImpl (packet_in packet,
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.ether_type){
+            TYPE_BROADCAST: parse_marquer;
             default: accept;
         }
     }
+
+    state parse_marquer{
+        packet.extract(hdr.marquer.next);
+        transition select(hdr.marquer.last.ether_type){
+            TYPE_BROADCAST: parse_marquer;
+            default: accept;
+        }
+    }
+
 }
 
 
@@ -126,7 +142,6 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
     action drop() {
         mark_to_drop(standard_metadata);
     }
-
 
     // *** L2 BRIDGING
     //
@@ -159,48 +174,27 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         standard_metadata.egress_spec = port_num;
     }
 
+    action add_switch_id(port_num_t port_num, switch_id_t switch_id_value) {
+        set_egress_port(port_num);
+        local_metadata.switch_id = switch_id_value;
+    }
+
     table l2_exact_table {
         key = {
             hdr.ethernet.dst_addr: exact;
         }
         actions = {
             set_egress_port;
-            //@defaultonly drop;
+            @defaultonly add_switch_id;
         }
         //const default_action = drop;
-        const default_action = set_egress_port(1); // Need to make the device have always the same port for the antena
+        //const default_action = set_egress_port(1); // Need to make the device have always the same port for the antena
         // The @name annotation is used here to provide a name to this table
         // counter, as it will be needed by the compiler to generate the
         // corresponding P4Info entity.
         @name("l2_exact_table_counter")
         counters = direct_counter(CounterType.packets_and_bytes);
     }
-
-    // --- l2_ternary_table (for broadcast/multicast entries) ------------------
-
-    action set_multicast_group(mcast_group_id_t gid) {
-        // gid will be used by the Packet Replication Engine (PRE) in the
-        // Traffic Manager--located right after the ingress pipeline, to
-        // replicate a packet to multiple egress ports, specified by the control
-        // plane by means of P4Runtime MulticastGroupEntry messages.
-        standard_metadata.mcast_grp = gid;
-        local_metadata.is_multicast = true;
-    }
-
-    table l2_ternary_table {
-        key = {
-            hdr.ethernet.dst_addr: ternary;
-        }
-        actions = {
-            set_multicast_group;
-            drop;
-        }
-        //default_action = drop;
-        default_action = set_multicast_group(255);  
-        @name("l2_ternary_table_counter")
-        counters = direct_counter(CounterType.packets_and_bytes);
-    }
-
 
     // *** ACL
     //
@@ -216,13 +210,13 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         standard_metadata.egress_spec = CPU_PORT;
     }
 
-    action clone_to_cpu() {
+    action clone_to_cpu(session_id_t session_id) {
         // Cloning is achieved by using a v1model-specific primitive. Here we
         // set the type of clone operation (ingress-to-egress pipeline), the
         // clone session ID (the CPU one), and the metadata fields we want to
         // preserve for the cloned packet replica.
-        // clone3(CloneType.I2E, CPU_CLONE_SESSION_ID, { standard_metadata.ingress_port });
-	    clone_preserving_field_list(CloneType.I2E, CPU_CLONE_SESSION_ID, 0);
+        // clone3(CloneType.I2E, session_id, { standard_metadata.ingress_port });
+	    clone_preserving_field_list(CloneType.I2E, session_id, CLONE_TO_CONTROLLER);
     }
 
     table acl_table {
@@ -231,8 +225,6 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
             hdr.ethernet.dst_addr:          ternary;
             hdr.ethernet.src_addr:          ternary;
             hdr.ethernet.ether_type:        ternary;
-            local_metadata.l4_src_port:     ternary;
-            local_metadata.l4_dst_port:     ternary;
         }
         actions = {
             send_to_cpu;
@@ -243,29 +235,108 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         counters = direct_counter(CounterType.packets_and_bytes);
     }
 
+    // DEBUG TABLE
+
+    table debug {
+        key = {
+            local_metadata.host_port  : exact;
+            //local_metadata.switch_id   : exact;
+            //hdr.marquer[0].switch_id   : exact;
+            //hdr.marquer[1].switch_id   : exact;
+            //hdr.marquer[2].switch_id   : exact;
+            //hdr.marquer[3].switch_id   : exact;
+        }
+        actions = {
+            NoAction;
+        }
+        default_action = NoAction;
+    }
+
     apply {
+
+        //local_metadata.host_port = standard_metadata.ingress_port;
         
         if (hdr.cpu_out.isValid()) {
-            // *** TODO EXERCISE 4
-            // Implement logic such that if this is a packet-out from the
-            // controller:
-            // 1. Set the packet egress port to that found in the cpu_out header
-            // 2. Remove (set invalid) the cpu_out header
-            // 3. Exit the pipeline here (no need to go through other tables)
 
+            // Set the packet egress port to that found in the cpu_out header
             standard_metadata.egress_spec = hdr.cpu_out.egress_port;
+
+            // Remove (set invalid) the cpu_out header
             hdr.cpu_out.setInvalid();
+
+            // Exit the pipeline here (no need to go through other tables)
             exit;
         }
 
-        // L2 bridging logic. Apply the exact table first...
-        /*
-        if (!l2_exact_table.apply().hit) {
-            l2_ternary_table.apply();
+        // This needs to go to a better place, because right here it will always insert a new rule.
+        // It need to be called when the packet does not come from the broadcast port
+        // This conditional can be better.
+        if (standard_metadata.ingress_port != 1) {
+            acl_table.apply();
         }
-        */
+
         l2_exact_table.apply();
-        acl_table.apply();
+
+        if (standard_metadata.egress_spec == 1) {
+
+            // Check if any marquer id matches the switch_id from metadata, or if the max size has been reached
+            if ((hdr.marquer[0].isValid() && hdr.marquer[0].switch_id == local_metadata.switch_id) ||
+                (hdr.marquer[1].isValid() && hdr.marquer[1].switch_id == local_metadata.switch_id) ||
+                (hdr.marquer[2].isValid() && hdr.marquer[2].switch_id == local_metadata.switch_id) ||
+                hdr.marquer[3].isValid()) {
+                mark_to_drop(standard_metadata);
+            } else {
+                // Add the switch id marquer in the right place
+                if (hdr.ethernet.ether_type != TYPE_BROADCAST) {
+                    hdr.marquer[0].setValid();
+                    hdr.marquer[0].switch_id = local_metadata.switch_id;
+                    hdr.marquer[0].ether_type = hdr.ethernet.ether_type;
+                    hdr.ethernet.ether_type = TYPE_BROADCAST;
+                }
+                else if (hdr.marquer[0].ether_type != TYPE_BROADCAST) {
+                    hdr.marquer[1].setValid();
+                    hdr.marquer[1].switch_id = local_metadata.switch_id;
+                    hdr.marquer[1].ether_type = hdr.marquer[0].ether_type;
+                    hdr.marquer[0].ether_type = TYPE_BROADCAST;
+                }
+                else if (hdr.marquer[1].ether_type != TYPE_BROADCAST) {
+                    hdr.marquer[2].setValid();
+                    hdr.marquer[2].switch_id = local_metadata.switch_id;
+                    hdr.marquer[2].ether_type = hdr.marquer[1].ether_type;
+                    hdr.marquer[1].ether_type = TYPE_BROADCAST;
+                }
+                else if (hdr.marquer[2].ether_type != TYPE_BROADCAST) {
+                    hdr.marquer[3].setValid();
+                    hdr.marquer[3].switch_id = local_metadata.switch_id;
+                    hdr.marquer[3].ether_type = hdr.marquer[2].ether_type;
+                    hdr.marquer[2].ether_type = TYPE_BROADCAST;
+                }
+            }
+        
+
+        } else {
+            // If the destination has been reached, put the ether_type in the correct place and discard all marquers
+            if (hdr.ethernet.ether_type != TYPE_BROADCAST) {
+            }
+            else if (hdr.marquer[0].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marquer[0].ether_type;
+            }
+            else if (hdr.marquer[1].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marquer[1].ether_type;
+            }
+            else if (hdr.marquer[2].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marquer[2].ether_type;
+            }
+            else if (hdr.marquer[3].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marquer[3].ether_type;
+            }
+            hdr.marquer[0].setInvalid();
+            hdr.marquer[1].setInvalid();
+            hdr.marquer[2].setInvalid();
+            hdr.marquer[3].setInvalid();
+        }
+
+
         
     }
 }
@@ -298,9 +369,11 @@ control EgressPipeImpl (inout parsed_headers_t hdr,
         // sure we are not replicating the packet on the same port where it was
         // received. This is useful to avoid broadcasting NDP requests on the
         // ingress port.
-        if (local_metadata.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port) {
-            mark_to_drop(standard_metadata);
-        }
+        //if (local_metadata.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port) {
+        //    mark_to_drop(standard_metadata);
+        //}
+
+
     }
 }
 
@@ -314,6 +387,7 @@ control DeparserImpl(packet_out packet, in parsed_headers_t hdr) {
     apply {
         packet.emit(hdr.cpu_in);
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.marquer);
     }
 }
 

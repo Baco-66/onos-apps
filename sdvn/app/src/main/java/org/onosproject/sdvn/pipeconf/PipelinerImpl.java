@@ -39,9 +39,10 @@ import org.onosproject.net.flowobjective.ObjectiveError;
 import org.onosproject.net.group.GroupDescription;
 import org.onosproject.net.group.GroupService;
 import org.onosproject.net.pi.model.PiActionId;
+import org.onosproject.net.pi.model.PiActionParamId;
 import org.onosproject.net.pi.model.PiTableId;
 import org.onosproject.net.pi.runtime.PiAction;
-import static org.onosproject.sdvn.AppConstants.CPU_CLONE_SESSION_ID;
+import org.onosproject.net.pi.runtime.PiActionParam;
 import org.onosproject.sdvn.common.Utils;
 import org.slf4j.Logger;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -94,9 +95,14 @@ public class PipelinerImpl extends AbstractHandlerBehaviour implements Pipeliner
             obj.context().ifPresent(c -> c.onError(obj, ObjectiveError.UNSUPPORTED));
         }
 
+        int cloneSession = Utils.getUniqueSessionId(deviceId);
+
         // Create an equivalent FlowRule with same selector and clone_to_cpu action.
         final PiAction cloneToCpuAction = PiAction.builder()
                 .withId(PiActionId.of(CLONE_TO_CPU))
+                .withParameter(new PiActionParam(
+                            PiActionParamId.of("session_id"),
+                            cloneSession))
                 .build();
 
         final FlowRule.Builder ruleBuilder = DefaultFlowRule.builder()
@@ -117,7 +123,7 @@ public class PipelinerImpl extends AbstractHandlerBehaviour implements Pipeliner
         final GroupDescription cloneGroup = Utils.buildCloneGroup(
                 obj.appId(),
                 deviceId,
-                CPU_CLONE_SESSION_ID,
+                cloneSession,
                 // Ports where to clone the packet.
                 // Just controller in this case.
                 Collections.singleton(PortNumber.CONTROLLER));

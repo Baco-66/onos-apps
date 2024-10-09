@@ -43,6 +43,7 @@ import org.onosproject.net.pi.model.PiTableId;
 import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiGroupKey;
 import org.onosproject.net.pi.runtime.PiTableAction;
+import static org.onosproject.sdvn.AppConstants.CPU_CLONE_SESSION_ID;
 import static org.onosproject.sdvn.AppConstants.DEFAULT_FLOW_RULE_PRIORITY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,5 +166,24 @@ public final class Utils {
             log.error("Interrupted!", e);
             Thread.currentThread().interrupt();
         }
+    }
+
+    public static int getUniqueSessionId(DeviceId deviceId) {
+        // Get the string representation of the DeviceId
+        String deviceIdStr = deviceId.toString(); // This will be "device:obu2"
+
+        // Extract the numeric part from the DeviceId string
+        String[] parts = deviceIdStr.split(":");
+
+        // Assuming the format is "device:obuX", where X is the number you want
+        String deviceNumStr = parts[1]; // This will give you "obu2"
+
+        // Extract the numeric value from the "obuX" string
+        // If "obuX" is in the format of "obu2", extract the number
+        String deviceNum = deviceNumStr.replaceAll("[^0-9]", ""); // Extracting just the digits
+        int deviceNumInt = Integer.parseInt(deviceNum); // Convert to integer
+
+        // Now create the unique clone session ID
+        return CPU_CLONE_SESSION_ID + deviceNumInt; // Add static value to the numeric part
     }
 }

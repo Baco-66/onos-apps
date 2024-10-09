@@ -52,16 +52,19 @@ import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiPacketMetadata;
 import org.onosproject.net.pi.runtime.PiPacketOperation;
 import static org.onosproject.sdvn.AppConstants.CPU_PORT_ID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-
 
 /**
  * Interpreter implementation.
  */
 public class InterpreterImpl extends AbstractHandlerBehaviour
         implements PiPipelineInterpreter {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
 
     // From v1model.p4
@@ -182,7 +185,7 @@ public class InterpreterImpl extends AbstractHandlerBehaviour
         // Find the ingress_port metadata.
         // *** TODO EXERCISE 4: modify metadata names to match P4Info
         // ---- START SOLUTION ----
-        final String inportMetadataName = "ingress_port";
+        final String inportMetadataName = "host_port";
         // ---- END SOLUTION ----
         Optional<PiPacketMetadata> inportMetadata = packetIn.metadatas()
                 .stream()
@@ -213,6 +216,12 @@ public class InterpreterImpl extends AbstractHandlerBehaviour
         final short portNum = portBytes.asReadOnlyBuffer().getShort();
         final ConnectPoint receivedFrom = new ConnectPoint(
                 deviceId, PortNumber.portNumber(portNum));
+
+        log.info("Recieved inbound packet \"{}\"...",
+                packetIn);
+
+        log.info("Recieved inbound packet with port {}...",
+                portNum);
 
         return new DefaultInboundPacket(receivedFrom, ethPkt, rawData);
     }

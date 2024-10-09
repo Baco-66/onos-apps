@@ -1,0 +1,55 @@
+{
+	"devices": {
+		"device:obu1": {
+			"basic": {
+				"managementAddress": "grpc://192.168.137.252:9559?device_id=1",
+				"driver": "bmv2",
+				"pipeconf": "org.onosproject.ngsdn-tutorial",
+				"locType": "grid",
+				"gridX": 200,
+				"gridY": 600
+			},
+			"fabricDeviceConfig": {
+				"myStationMac": "1e:40:77:21:f5:58",
+				"mySid": "3:101:2::",
+				"isSpine": false
+			}
+		}
+	},
+	"ports": {
+		"device:obu1/1": {
+		"interfaces": [
+			{
+			"name": "obu1-1",
+			"ips": ["10.10.10.254/24"]
+			}
+		]
+		},
+		"device:obu1/2": {
+		"interfaces": [
+			{
+			"name": "obu1-2",
+			"ips": ["10.10.10.254/24"]
+			}
+		]
+		}
+	},
+	"hosts": {
+		"2a:2f:dd:8b:5f:99/None": {
+		"basic": {
+			"name": "vrf1",
+			"locType": "grid",
+			"gridX": 100,
+			"gridY": 700
+		}
+		},
+		"1a:9b:17:ea:99:88/None": {
+		"basic": {
+			"name": "vrf2",
+			"locType": "grid",
+			"gridX": 100,
+			"gridY": 800
+		}
+		}
+	}
+}
