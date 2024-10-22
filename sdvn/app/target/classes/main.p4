@@ -24,10 +24,10 @@
 #define CPU_PORT 200 
 // Changed from 255 to 200 for fear of a bug
 
-#define TYPE_BROADCAST 0x9001
-
 
 #define MAX_HOPS 4
+
+
 
 typedef bit<32>  session_id_t;
 typedef bit<9>   port_num_t;
@@ -36,6 +36,7 @@ typedef bit<16>  mcast_group_id_t;
 typedef bit<8>   switch_id_t;
 
 const bit<8> CLONE_TO_CONTROLLER = 1;
+const bit<16> TYPE_BROADCAST = 0x9001;
 
 
 //------------------------------------------------------------------------------
@@ -50,6 +51,7 @@ header ethernet_t {
 
 header marquer_t {
     bit<8>      switch_id;
+    mac_addr_t  dst_addr;
     bit<16>     ether_type;
 }
 
@@ -81,9 +83,10 @@ struct parsed_headers_t {
 }
 
 struct local_metadata_t {
-    switch_id_t switch_id;
+    switch_id_t          switch_id;
+    bool                 is_multicast;
     @field_list(CLONE_TO_CONTROLLER)
-    port_num_t  host_port;
+    port_num_t           host_port;
 }
 
 
@@ -178,12 +181,24 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         local_metadata.switch_id = switch_id_value;
     }
 
+    action set_multicast_group(mcast_group_id_t gid, switch_id_t switch_id_value) {
+        // gid will be used by the Packet Replication Engine (PRE) in the
+        // Traffic Manager--located right after the ingress pipeline, to
+        // replicate a packet to multiple egress ports, specified by the control
+        // plane by means of P4Runtime MulticastGroupEntry messages.
+        standard_metadata.mcast_grp = gid;
+        local_metadata.is_multicast = true;
+        local_metadata.switch_id = switch_id_value;
+    }
+
+
     table l2_exact_table {
         key = {
             hdr.ethernet.dst_addr: exact;
         }
         actions = {
             set_egress_port;
+            set_multicast_group;
             @defaultonly add_switch_id;
         }
         //const default_action = drop;
@@ -215,6 +230,7 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         // clone session ID (the CPU one), and the metadata fields we want to
         // preserve for the cloned packet replica.
         // clone3(CloneType.I2E, session_id, { standard_metadata.ingress_port });
+        local_metadata.host_port = standard_metadata.ingress_port;
 	    clone_preserving_field_list(CloneType.I2E, session_id, CLONE_TO_CONTROLLER);
     }
 
@@ -238,7 +254,7 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
 
     table debug {
         key = {
-            local_metadata.host_port  : exact;
+            local_metadata.host_port     : exact;
             //local_metadata.switch_id   : exact;
             //hdr.marquer[0].switch_id   : exact;
             //hdr.marquer[1].switch_id   : exact;
@@ -252,8 +268,6 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
     }
 
     apply {
-
-        local_metadata.host_port = standard_metadata.ingress_port;
         
         if (hdr.cpu_out.isValid()) {
 
@@ -270,13 +284,82 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         // This needs to go to a better place, because right here it will always insert a new rule.
         // It need to be called when the packet does not come from the broadcast port
         // This conditional can be better.
-        if (standard_metadata.ingress_port != 1) {
+        if (standard_metadata.ingress_port == 1) {
+            if (hdr.marquer[0].isValid()){
+                hdr.ethernet.dst_addr = hdr.marquer[0].dst_addr;
+            } else {
+                mark_to_drop(standard_metadata);
+                exit;
+            }
+        } else {
             acl_table.apply();
         }
 
         l2_exact_table.apply();
 
-        if (standard_metadata.egress_spec == 1) {
+        /*
+        if (standard_metadata.ingress_port == 1){
+            l2_exact_table.apply();
+        } else if (l2_exact_table.apply().hit){
+            if (local_metadata.is_multicast == true){
+                if (){
+                    acl_table.apply();
+                }
+            } else {
+                // nothing
+            }
+        } else {
+            acl_table.apply();
+        }
+        */
+
+
+    }
+}
+
+//------------------------------------------------------------------------------
+// EGRESS PIPELINE
+//------------------------------------------------------------------------------
+
+
+control EgressPipeImpl (inout parsed_headers_t hdr,
+                        inout local_metadata_t local_metadata,
+                        inout standard_metadata_t standard_metadata) {
+
+    // DEBUG TABLE
+
+    table debug {
+        key = {
+            local_metadata.host_port        : exact;
+            standard_metadata.ingress_port  : exact;
+            hdr.cpu_in.ingress_port         : exact;
+        }
+        actions = {
+            NoAction;
+        }
+        default_action = NoAction;
+    }
+
+
+    apply {
+
+        if (standard_metadata.egress_port == CPU_PORT) { 
+            // If the packet is to be forwarded to the CPU port e.g., if in 
+            // ingress we matched on the ACL table with action send/clone_to_cpu...
+
+            // Set cpu_in header as valid
+            hdr.cpu_in.setValid(); 
+            // Set the cpu_in.ingress_port field to the original 
+            // packet's ingress port (standard_metadata.ingress_port 
+            // stored in local_metadata.host_port).
+            hdr.cpu_in.ingress_port = local_metadata.host_port; 
+
+            exit;
+        }
+
+
+
+        if (standard_metadata.egress_port == 1) {
 
             // Check if any marquer id matches the switch_id from metadata, or if the max size has been reached
             if ((hdr.marquer[0].isValid() && hdr.marquer[0].switch_id == local_metadata.switch_id) ||
@@ -291,6 +374,9 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
                     hdr.marquer[0].switch_id = local_metadata.switch_id;
                     hdr.marquer[0].ether_type = hdr.ethernet.ether_type;
                     hdr.ethernet.ether_type = TYPE_BROADCAST;
+                    hdr.marquer[0].dst_addr = hdr.ethernet.dst_addr;
+                    hdr.ethernet.dst_addr = 0xFFFFFFFFFFFF;
+
                 }
                 else if (hdr.marquer[0].ether_type != TYPE_BROADCAST) {
                     hdr.marquer[1].setValid();
@@ -314,6 +400,14 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         
 
         } else {
+
+            // If this is a multicast packet make sure we are not replicating 
+            // the packet on the same port where it was received
+            if (local_metadata.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port) {
+                mark_to_drop(standard_metadata);
+                exit;
+            }
+
             // If the destination has been reached, put the ether_type in the correct place and discard all marquers
             if (hdr.ethernet.ether_type != TYPE_BROADCAST) {
             }
@@ -334,43 +428,6 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
             hdr.marquer[2].setInvalid();
             hdr.marquer[3].setInvalid();
         }
-
-
-        
-    }
-}
-
-//------------------------------------------------------------------------------
-// EGRESS PIPELINE
-//------------------------------------------------------------------------------
-
-
-control EgressPipeImpl (inout parsed_headers_t hdr,
-                        inout local_metadata_t local_metadata,
-                        inout standard_metadata_t standard_metadata) {
-    apply {
-
-        if (standard_metadata.egress_port == CPU_PORT) {
-            // *** TODO EXERCISE 4
-            // Implement logic such that if the packet is to be forwarded to the
-            // CPU port, e.g., if in ingress we matched on the ACL table with
-            // action send/clone_to_cpu...
-            // 1. Set cpu_in header as valid
-            // 2. Set the cpu_in.ingress_port field to the original packet's
-            //    ingress port (standard_metadata.ingress_port).
-
-            hdr.cpu_in.setValid();
-            hdr.cpu_in.ingress_port = standard_metadata.ingress_port;
-            exit;
-        }
-
-        // If this is a multicast packet (flag set by l2_ternary_table), make
-        // sure we are not replicating the packet on the same port where it was
-        // received. This is useful to avoid broadcasting NDP requests on the
-        // ingress port.
-        //if (local_metadata.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port) {
-        //    mark_to_drop(standard_metadata);
-        //}
 
 
     }

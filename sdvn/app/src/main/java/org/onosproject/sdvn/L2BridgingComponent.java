@@ -16,9 +16,13 @@
 
 package org.onosproject.sdvn;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.mastership.MastershipService;
+import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Host;
 import org.onosproject.net.PortNumber;
@@ -28,9 +32,13 @@ import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.flow.criteria.PiCriterion;
+import org.onosproject.net.group.GroupDescription;
+import org.onosproject.net.group.GroupService;
 import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
+import org.onosproject.net.intf.Interface;
+import org.onosproject.net.intf.InterfaceService;
 import org.onosproject.net.pi.model.PiActionId;
 import org.onosproject.net.pi.model.PiActionParamId;
 import org.onosproject.net.pi.model.PiMatchFieldId;
@@ -59,7 +67,7 @@ public class L2BridgingComponent {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    //private static final int DEFAULT_BROADCAST_GROUP_ID = 255;
+    private static final int DEFAULT_BROADCAST_GROUP_ID = 255;
 
     private final DeviceListener deviceListener = new InternalDeviceListener();
     private final HostListener hostListener = new InternalHostListener();
@@ -79,14 +87,14 @@ public class L2BridgingComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     private DeviceService deviceService;
 
-    //@Reference(cardinality = ReferenceCardinality.MANDATORY)
-    //private InterfaceService interfaceService;
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private InterfaceService interfaceService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     private FlowRuleService flowRuleService;
 
-    //@Reference(cardinality = ReferenceCardinality.MANDATORY)
-    //private GroupService groupService;
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private GroupService groupService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     private MastershipService mastershipService;
@@ -128,8 +136,9 @@ public class L2BridgingComponent {
      * @param deviceId the device to set up
      */
     private void setUpDevice(DeviceId deviceId) {
-        //insertUnicastHostFLowRule(deviceId);
-        insertDefaultBroadcastFlowRule(deviceId);
+        insertBroadcastGroup(deviceId);
+        insertBroadcastFlowRules(deviceId);
+        insertDefaultFlowRule(deviceId);
     }
 
     /**
@@ -140,50 +149,29 @@ public class L2BridgingComponent {
      * (PRE) Multicast groups.
      *
      * @param deviceId the device where to install the group
-    private void insertUnicastHostFLowRule(DeviceId deviceId) {
+     */
 
-        Map<PortNumber, MacAddress> ports = getHostFacingPorts(deviceId);
+    private void insertBroadcastGroup(DeviceId deviceId) {
+
+        Set<PortNumber> ports = getPorts(deviceId);
 
         if (ports.isEmpty()) {
             // Stop here.
-            log.warn("Device {} has 0 host facing ports", deviceId);
+            log.warn("Device {} has 0 ports", deviceId);
             return;
         }
 
-        for (Map.Entry<PortNumber, MacAddress> entry : ports.entrySet()) {
-            PortNumber portNumber = entry.getKey();
-            MacAddress macAddress = entry.getValue();
+        log.info("Adding L2 multicast group with \"{}\" on {}...",
+                ports, deviceId);
 
-            log.info("Adding L2 rule for ports {} on {}...",
-                    portNumber, deviceId);
+        // Forge group object.
+        final GroupDescription multicastGroup = Utils.buildMulticastGroup(
+                appId, deviceId, DEFAULT_BROADCAST_GROUP_ID, ports);
 
-            final PiCriterion macExactCriterion = PiCriterion.builder()
-                .matchExact(
-                    PiMatchFieldId.of("hdr.ethernet.dst_addr"),
-                    macAddress.toBytes())
-                .build();
-
-            // Action: set forwarding rule
-            final PiAction setForwardAction = PiAction.builder()
-                    .withId(PiActionId.of("IngressPipeImpl.set_egress_port"))
-                    .withParameter(new PiActionParam(
-                            PiActionParamId.of("port_num"),
-                            portNumber.toLong()))
-                    .build();
-
-            //  Build 2 flow rules.
-            final String tableId = "IngressPipeImpl.l2_exact_table";
-            // ---- END SOLUTION ----
-
-            final FlowRule rule1 = Utils.buildFlowRule(
-                    deviceId, appId, tableId,
-                    macExactCriterion, setForwardAction);
-
-            // Insert rules.
-            flowRuleService.applyFlowRules(rule1);
-        }
+        // Insert.
+        groupService.addGroup(multicastGroup);
     }
-     */
+
 
     /*
      * Insert flow rule that matches all unmatched ethernet traffic. This
@@ -198,7 +186,7 @@ public class L2BridgingComponent {
      */
 
     @SuppressWarnings("unused")
-    private void insertDefaultBroadcastFlowRule(DeviceId deviceId) {
+    private void insertDefaultFlowRule(DeviceId deviceId) {
 
         log.info("Adding default rule on {}...", deviceId);
 
@@ -239,19 +227,15 @@ public class L2BridgingComponent {
      * captured by the InternalDeviceListener defined below.
      *
      * @param deviceId device ID where to install the rules
+     */
+    private void insertBroadcastFlowRules(DeviceId deviceId) {
 
-    private void insertMulticastFlowRules(DeviceId deviceId) {
+        log.info("Adding L2 broadcast rules on {}...", deviceId);
 
-        log.info("Adding L2 multicast rules on {}...", deviceId);
-
-        // Modify P4Runtime entity names to match content of P4Info file (look
-        // for the fully qualified name of tables, match fields, and actions.
-        // ---- START SOLUTION ----
-        // Match ARP request - Match exactly FF:FF:FF:FF:FF:FF
+        // Match exactly FF:FF:FF:FF:FF:FF
         final PiCriterion macBroadcastCriterion = PiCriterion.builder()
-                .matchTernary(
+                .matchExact(
                         PiMatchFieldId.of("hdr.ethernet.dst_addr"),
-                        MacAddress.valueOf("FF:FF:FF:FF:FF:FF").toBytes(),
                         MacAddress.valueOf("FF:FF:FF:FF:FF:FF").toBytes())
                 .build();
 
@@ -261,73 +245,21 @@ public class L2BridgingComponent {
                 .withParameter(new PiActionParam(
                         PiActionParamId.of("gid"),
                         DEFAULT_BROADCAST_GROUP_ID))
+                .withParameter(new PiActionParam(
+                        PiActionParamId.of("switch_id_value"),
+                        Utils.getUniqueSessionId(deviceId)))
                 .build();
 
-        //  Build 2 flow rules.
-        final String tableId = "IngressPipeImpl.l2_ternary_table";
-        // ---- END SOLUTION ----
+        final String tableId = "IngressPipeImpl.l2_exact_table";
 
         final FlowRule rule1 = Utils.buildFlowRule(
                 deviceId, appId, tableId,
                 macBroadcastCriterion, setMcastGroupAction);
 
 
-        // Insert rules.
+        // Insert rule
         flowRuleService.applyFlowRules(rule1);
     }
-
-     * Insert flow rule that matches all unmatched ethernet traffic. This
-     * will implement the traditional briding behavior that floods all
-     * unmatched traffic.
-     * <p>
-     * This method will be called at component activation for each device
-     * (switch) known by ONOS, and every time a new device-added event is
-     * captured by the InternalDeviceListener defined below.
-     *
-     * @param deviceId device ID where to install the rules
-
-    @SuppressWarnings("unused")
-    private void insertUnmatchedBridgingFlowRule(DeviceId deviceId) {
-
-        log.info("Adding L2 multicast rules on {}...", deviceId);
-
-        // Modify P4Runtime entity names to match content of P4Info file (look
-        // for the fully qualified name of tables, match fields, and actions.
-        // ---- START SOLUTION ----
-
-        // Match unmatched traffic - Match ternary **:**:**:**:**:**
-        //final PiCriterion unmatchedTrafficCriterion = PiCriterion.builder()
-        //        .matchTernary(
-        //                PiMatchFieldId.of("hdr.ethernet.dst_addr"),
-        //                MacAddress.valueOf("00:00:00:00:00:00").toBytes(),
-        //                //MacAddress.valueOf("00:00:00:00:00:00").toBytes()
-        //                null)
-        //        .build();
-
-        // Action: set multicast group id
-        final PiAction setMcastGroupAction = PiAction.builder()
-                .withId(PiActionId.of("IngressPipeImpl.set_multicast_group"))
-                .withParameter(new PiActionParam(
-                        PiActionParamId.of("gid"),
-                        DEFAULT_BROADCAST_GROUP_ID))
-                .build();
-
-        //  Build flow rule.
-        final String tableId = "IngressPipeImpl.l2_ternary_table";
-        // ---- END SOLUTION ----
-
-        /* Chaged the method used here because of an error "Invalid representation of 'don't care' ternary match"
-        In this github issue https://github.com/opennetworkinglab/ngsdn-tutorial/issues/93 the solution was to add this
-        Also hid the PiCriterion acordingly
-
-        final FlowRule rule = Utils.buildFlowRuleDefaultAction(
-                deviceId, appId, tableId,
-                setMcastGroupAction);
-
-        // Insert rules.
-        flowRuleService.applyFlowRules(rule);
-    }
-    */
 
     /**
      * Insert flow rules to forward packets to a given host located at the given
@@ -343,15 +275,13 @@ public class L2BridgingComponent {
      */
     private void learnHost(Host host, DeviceId deviceId, PortNumber port) {
 
-        log.info("Adding L2 unicast rule on {} for host {} (port {})...",
-                deviceId, host.id(), port);
-
-        // Modify P4Runtime entity names to match content of P4Info file (look
-        // for the fully qualified name of tables, match fields, and actions.
-        // ---- START SOLUTION ----
         final String tableId = "IngressPipeImpl.l2_exact_table";
         // Match exactly on the host MAC address.
         final MacAddress hostMac = host.mac();
+
+        log.info("Adding L2 unicast rule on {} for host {}:{} (port {})...",
+                deviceId, host.id(), hostMac, port);
+
         final PiCriterion hostMacCriterion = PiCriterion.builder()
                 .matchExact(PiMatchFieldId.of("hdr.ethernet.dst_addr"),
                         hostMac.toBytes())
@@ -364,7 +294,6 @@ public class L2BridgingComponent {
                         PiActionParamId.of("port_num"),
                         port.toLong()))
                 .build();
-        // ---- END SOLUTION ----
 
         // Forge flow rule.
         final FlowRule rule = Utils.buildFlowRule(
@@ -472,39 +401,26 @@ public class L2BridgingComponent {
      *
      * @param deviceId device ID
      * @return set of host facing ports
+     */
 
-    private Map<PortNumber, MacAddress> getHostFacingPorts(DeviceId deviceId) {
+    private Set<PortNumber> getPorts(DeviceId deviceId) {
         // Get all interfaces configured via netcfg for the given device ID and
         // return the corresponding device port number. Interface configuration
         // in the netcfg.json looks like this:
-        // "device:leaf1/3": {
+        // "device:host1/3": {
         //   "interfaces": [
         //     {
-        //       "name": "leaf1-3",
-        //       "ips": ["2001:1:1::ff/64"]
+        //       "name": "host1-3",
+        //       (...)
         //     }
         //   ]
         // }
-
-        //return interfaceService.getInterfaces().stream()
-        //        .map(Interface::connectPoint)
-        //        .filter(cp -> cp.deviceId().equals(deviceId))
-        //        .map(ConnectPoint::port)
-        //        .collect(Collectors.toSet());
-
         return interfaceService.getInterfaces().stream()
-                .filter(i -> i.connectPoint().deviceId().equals(deviceId))
-                .collect(Collectors.toMap(
-                    i -> i.connectPoint().port(),  // Port number
-                    i -> i.mac()                   // MAC address
-                ));
-
-        // import org.onosproject.net.Port;
-        //return deviceService.getPorts(deviceId).stream()
-        //   .map(Port::number)  // Get the port number
-        //   .collect(Collectors.toSet());  // Collect into a Set
+                .map(Interface::connectPoint)
+                .filter(cp -> cp.deviceId().equals(deviceId))
+                .map(ConnectPoint::port)
+                .collect(Collectors.toSet());
     }
-    */
 
     /**
      * Sets up L2 bridging on all devices known by ONOS and for which this ONOS

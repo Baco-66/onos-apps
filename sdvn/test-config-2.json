@@ -34,24 +34,38 @@
 	},
 	"ports": {
 		"device:obu1/2": {
-		"interfaces": [
-			{
-			"name": "obu1-2",
-			"ips": ["10.10.10.254/24"]
-			}
-		]
+			"interfaces": [
+				{
+				"name": "obu1-2",
+				"ips": ["10.10.10.254/24"]
+				}
+			]
+		},
+		"device:obu1/1": {
+			"interfaces": [
+				{
+				"name": "obu1-1"
+				}
+			]
 		},
 		"device:obu2/2": {
-		"interfaces": [
-			{
-			"name": "obu2-2",
-			"ips": ["10.10.10.254/24"]
-			}
-		]
+			"interfaces": [
+				{
+				"name": "obu2-2",
+				"ips": ["10.10.10.254/24"]
+				}
+			]
+		},
+		"device:obu2/1": {
+				"interfaces": [
+					{
+					"name": "obu2-1"
+					}
+				]
 		}
 	},
 	"hosts": {
-		"1a:ca:1c:42:c0:d0/None": {
+		"4a:8f:9b:f4:fc:66/None": {
 		"basic": {
 			"name": "host1-253",
 			"locType": "grid",
@@ -59,7 +73,7 @@
 			"gridY": 700
 		}
 		},
-		"fa:66:f0:e0:1a:f0/None": {
+		"ba:1b:b3:eb:40:90/None": {
 		"basic": {
 			"name": "host2-252",
 			"locType": "grid",

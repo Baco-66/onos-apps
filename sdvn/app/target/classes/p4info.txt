@@ -20,6 +20,9 @@ tables {
     id: 24677122
   }
   action_refs {
+    id: 26016411
+  }
+  action_refs {
     id: 23988038
     annotations: "@defaultonly"
     scope: DEFAULT_ONLY
@@ -116,6 +119,23 @@ actions {
     id: 1
     name: "port_num"
     bitwidth: 9
+  }
+  params {
+    id: 2
+    name: "switch_id_value"
+    bitwidth: 8
+  }
+}
+actions {
+  preamble {
+    id: 26016411
+    name: "IngressPipeImpl.set_multicast_group"
+    alias: "set_multicast_group"
+  }
+  params {
+    id: 1
+    name: "gid"
+    bitwidth: 16
   }
   params {
     id: 2

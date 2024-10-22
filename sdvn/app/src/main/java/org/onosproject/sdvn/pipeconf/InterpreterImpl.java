@@ -151,10 +151,7 @@ public class InterpreterImpl extends AbstractHandlerBehaviour
         }
 
         // Create metadata instance for egress port.
-        // *** TODO EXERCISE 4: modify metadata names to match P4 program
-        // ---- START SOLUTION ----
         final String outPortMetadataName = "egress_port";
-        // ---- END SOLUTION ----
         final PiPacketMetadata outPortMetadata = PiPacketMetadata.builder()
                 .withId(PiPacketMetadataId.of(outPortMetadataName))
                 .withValue(portBytes)
@@ -183,10 +180,7 @@ public class InterpreterImpl extends AbstractHandlerBehaviour
             throws PiInterpreterException {
 
         // Find the ingress_port metadata.
-        // *** TODO EXERCISE 4: modify metadata names to match P4Info
-        // ---- START SOLUTION ----
-        final String inportMetadataName = "host_port";
-        // ---- END SOLUTION ----
+        final String inportMetadataName = "ingress_port";
         Optional<PiPacketMetadata> inportMetadata = packetIn.metadatas()
                 .stream()
                 .filter(meta -> meta.id().id().equals(inportMetadataName))
@@ -216,9 +210,6 @@ public class InterpreterImpl extends AbstractHandlerBehaviour
         final short portNum = portBytes.asReadOnlyBuffer().getShort();
         final ConnectPoint receivedFrom = new ConnectPoint(
                 deviceId, PortNumber.portNumber(portNum));
-
-        log.info("Recieved inbound packet \"{}\"...",
-                packetIn);
 
         log.info("Recieved inbound packet with port {}...",
                 portNum);
