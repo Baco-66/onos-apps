@@ -50,7 +50,7 @@ Before running this application, ensure the following dependencies are installed
                 org.onosproject.p4runtime \
                 org.onosproject.drivers.p4runtime
 
-5. **Install the SDVN Application on ONOS**  
+5. **Install and activate the SDVN Application on ONOS**  
    Deploy the compiled `.oar` file to ONOS:
 
    ```bash
@@ -64,7 +64,7 @@ Before running this application, ensure the following dependencies are installed
 
 ## Expected Outcome
 
-After completing these steps, ONOS should detect and manage the devices defined in the configuration file. Three registered `pipeconfigs` should be visible, indicating that ONOS is correctly interfacing with the devices via P4Runtime.
+After completing these steps, ONOS should detect and manage the devices defined in the configuration file. Three registered `pipeconfigs` should be visible, indicating that ONOS has correctly activated the required applications.
 
 ---
 
