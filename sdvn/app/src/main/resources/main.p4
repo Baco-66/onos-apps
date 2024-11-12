@@ -54,7 +54,7 @@ header marker_t {
 }
 
 // Packet-in header. Prepended to packets sent to the CPU_PORT and used by the
-// P4Runtime server (Stratum) to populate the PacketIn message metadata fields.
+// P4Runtime server to populate the PacketIn message metadata fields.
 // Here we use it to carry the original ingress port where the packet was
 // received.
 @controller_header("packet_in")
@@ -152,7 +152,7 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
     //    the location (port) of new hosts is learned.
     // 2. Broadcast entries: used when the destination address is FF:FF:FF:FF:FF:FF
     // 3. Default entrie: sends the packet out port 1, which always corresponds to 
-    // the wireless antena
+    // 	  the wireless antena
 
     // --- l2_exact_table (for unicast entries) --------------------------------
 
@@ -211,7 +211,7 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         // type of clone operation (ingress-to-egress pipeline), the clone 
         // session ID (defined by the controller), and the tag of the fields we 
         // want to preserve for the cloned packet replica, which in this case 
-        // correspond to the ingress_port of the packet.
+        // contains the ingress_port of the packet.
         local_metadata.host_port = standard_metadata.ingress_port;
 	    clone_preserving_field_list(CloneType.I2E, session_id, CLONE_TO_CONTROLLER);
     }
@@ -246,8 +246,6 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
             exit;
         }
 
-        // This needs to go to a better place, because right here it will always insert a new rule.
-        // It need to be called when the packet does not come from the broadcast port
         // This conditional can be better.
         if (standard_metadata.ingress_port == 1) {
             if (hdr.marker[0].isValid()){
