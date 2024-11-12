@@ -68,6 +68,12 @@ After completing these steps, ONOS should detect and manage the devices defined 
 
 ---
 
+## Credits
+
+This project was initially forked from the [NGSDN Tutorial - Advanced](https://github.com/opennetworkinglab/ngsdn-tutorial/tree/advanced) repository. I would like to thank the Open Networking Lab for their work and contribution to this project.
+
+---
+
 ### Additional Notes
 
 - **Troubleshooting**: If ONOS fails to recognize the devices, ensure that the P4 code compiled without errors and that the configuration file is accurate and properly formatted.
