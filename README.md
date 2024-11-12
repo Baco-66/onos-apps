@@ -71,4 +71,4 @@ After completing these steps, ONOS should detect and manage the devices defined 
 ### Additional Notes
 
 - **Troubleshooting**: If ONOS fails to recognize the devices, ensure that the P4 code compiled without errors and that the configuration file is accurate and properly formatted.
-- **Compatibility**: This application was tested with ONOS version X.Y.Z (replace with actual version), and might require adjustments for other versions.
+- **Compatibility**: This application was tested with ONOS version 2.7.0, and might require adjustments for other versions.
