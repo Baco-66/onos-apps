@@ -170,16 +170,15 @@ public final class Utils {
 
     public static int getUniqueSessionId(DeviceId deviceId) {
         // Get the string representation of the DeviceId
-        String deviceIdStr = deviceId.toString(); // This will be "device:obu2"
+        String deviceIdStr = deviceId.toString(); 
 
         // Extract the numeric part from the DeviceId string
         String[] parts = deviceIdStr.split(":");
 
         // Assuming the format is "device:obuX", where X is the number you want
-        String deviceNumStr = parts[1]; // This will give you "obu2"
+        String deviceNumStr = parts[1]; // This will give you "obuX"
 
         // Extract the numeric value from the "obuX" string
-        // If "obuX" is in the format of "obu2", extract the number
         String deviceNum = deviceNumStr.replaceAll("[^0-9]", ""); // Extracting just the digits
         int deviceNumInt = Integer.parseInt(deviceNum); // Convert to integer
 
