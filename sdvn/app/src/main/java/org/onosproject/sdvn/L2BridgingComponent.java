@@ -59,8 +59,6 @@ import org.slf4j.LoggerFactory;
  */
 @Component(
         immediate = true,
-        // *** TODO EXERCISE 4
-        // Enable component (enabled = true)
         enabled = true
 )
 public class L2BridgingComponent {
@@ -131,7 +129,7 @@ public class L2BridgingComponent {
     }
 
     /**
-     * Sets up everything necessary to support L2 bridging on the given device.
+     * Sets up everything necessary to support L2 broadcast on the given device.
      *
      * @param deviceId the device to set up
      */
@@ -142,8 +140,7 @@ public class L2BridgingComponent {
     }
 
     /**
-     * Inserts an ALL group in the ONOS core to replicate packets on all host
-     * facing ports. This group will be used to broadcast all ARP/NDP requests.
+     * Inserts an ALL group in the ONOS core to replicate packets on all ports.
      * <p>
      * ALL groups in ONOS are equivalent to P4Runtime packet replication engine
      * (PRE) Multicast groups.
@@ -181,6 +178,7 @@ public class L2BridgingComponent {
      * This method will be called at component activation for each device
      * (switch) known by ONOS, and every time a new device-added event is
      * captured by the InternalDeviceListener defined below.
+     * This method will also send the switch id value to the switch.
      *
      * @param deviceId device ID where to install the rules
      */
@@ -217,14 +215,14 @@ public class L2BridgingComponent {
     }
 
     /**
-     * Insert flow rules matching ethernet destination
-     * broadcast/multicast addresses (e.g. ARP requests, NDP Neighbor
-     * Solicitation, etc.). Such packets should be processed by the multicast
+     * Insert flow rules matching ethernet destination broadcast
+     * address. Such packets should be processed by the multicast
      * group created before.
      * <p>
      * This method will be called at component activation for each device
      * (switch) known by ONOS, and every time a new device-added event is
      * captured by the InternalDeviceListener defined below.
+     * This method will also send the switch id value to the switch.
      *
      * @param deviceId device ID where to install the rules
      */
@@ -365,7 +363,6 @@ public class L2BridgingComponent {
                 case HOST_MOVED:
                 default:
                     // Ignore other events.
-                    // Food for thoughts: how to support host moved/removed?
                     return false;
             }
             // Process host event only if this controller instance is the master

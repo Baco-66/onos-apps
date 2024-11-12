@@ -44,10 +44,10 @@ header ethernet_t {
     bit<16>     ether_type;
 }
 
-// Marquer header. This is added to packets sent out port 1, which always 
+// Marker header. This is added to packets sent out port 1, which always 
 // corresponds to the wireless antenna. The marker stops the switch from 
 // repeatedly trasmiting the same packet. 
-header marquer_t {
+header marker_t {
     bit<8>      switch_id;
     mac_addr_t  dst_addr;
     bit<16>     ether_type;
@@ -77,7 +77,7 @@ struct parsed_headers_t {
     cpu_out_header_t     cpu_out;
     cpu_in_header_t      cpu_in;
     ethernet_t           ethernet;
-    marquer_t[MAX_HOPS]  marquer;
+    marker_t[MAX_HOPS]   marker;
 }
 
 struct local_metadata_t {
@@ -112,15 +112,15 @@ parser ParserImpl (packet_in packet,
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.ether_type){
-            TYPE_BROADCAST: parse_marquer;
+            TYPE_BROADCAST: parse_marker;
             default: accept;
         }
     }
 
-    state parse_marquer{
-        packet.extract(hdr.marquer.next);
-        transition select(hdr.marquer.last.ether_type){
-            TYPE_BROADCAST: parse_marquer;
+    state parse_marker{
+        packet.extract(hdr.marker.next);
+        transition select(hdr.marker.last.ether_type){
+            TYPE_BROADCAST: parse_marker;
             default: accept;
         }
     }
@@ -232,23 +232,6 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         counters = direct_counter(CounterType.packets_and_bytes);
     }
 
-    // DEBUG TABLE
-
-    table debug {
-        key = {
-            local_metadata.host_port     : exact;
-            //local_metadata.switch_id   : exact;
-            //hdr.marquer[0].switch_id   : exact;
-            //hdr.marquer[1].switch_id   : exact;
-            //hdr.marquer[2].switch_id   : exact;
-            //hdr.marquer[3].switch_id   : exact;
-        }
-        actions = {
-            NoAction;
-        }
-        default_action = NoAction;
-    }
-
     apply {
         
         if (hdr.cpu_out.isValid()) {
@@ -267,8 +250,8 @@ control IngressPipeImpl (inout parsed_headers_t    hdr,
         // It need to be called when the packet does not come from the broadcast port
         // This conditional can be better.
         if (standard_metadata.ingress_port == 1) {
-            if (hdr.marquer[0].isValid()){
-                hdr.ethernet.dst_addr = hdr.marquer[0].dst_addr;
+            if (hdr.marker[0].isValid()){
+                hdr.ethernet.dst_addr = hdr.marker[0].dst_addr;
             } else {
                 mark_to_drop(standard_metadata);
                 exit;
@@ -308,21 +291,6 @@ control EgressPipeImpl (inout parsed_headers_t hdr,
                         inout local_metadata_t local_metadata,
                         inout standard_metadata_t standard_metadata) {
 
-    // DEBUG TABLE
-
-    table debug {
-        key = {
-            local_metadata.host_port        : exact;
-            standard_metadata.ingress_port  : exact;
-            hdr.cpu_in.ingress_port         : exact;
-        }
-        actions = {
-            NoAction;
-        }
-        default_action = NoAction;
-    }
-
-
     apply {
 
         if (standard_metadata.egress_port == CPU_PORT) { 
@@ -343,38 +311,38 @@ control EgressPipeImpl (inout parsed_headers_t hdr,
 
         if (standard_metadata.egress_port == 1) {
 
-            // Check if any marquer id matches the switch_id from metadata, or if the max size has been reached
-            if ((hdr.marquer[0].isValid() && hdr.marquer[0].switch_id == local_metadata.switch_id) ||
-                (hdr.marquer[1].isValid() && hdr.marquer[1].switch_id == local_metadata.switch_id) ||
-                (hdr.marquer[2].isValid() && hdr.marquer[2].switch_id == local_metadata.switch_id) ||
-                hdr.marquer[3].isValid()) {
+            // Check if any marker id matches the switch_id from metadata, or if the max size has been reached
+            if ((hdr.marker[0].isValid() && hdr.marker[0].switch_id == local_metadata.switch_id) ||
+                (hdr.marker[1].isValid() && hdr.marker[1].switch_id == local_metadata.switch_id) ||
+                (hdr.marker[2].isValid() && hdr.marker[2].switch_id == local_metadata.switch_id) ||
+                hdr.marker[3].isValid()) {
                 mark_to_drop(standard_metadata);
             } else {
-                // Add the switch id marquer in the right place
+                // Add the switch id marker in the right place
                 if (hdr.ethernet.ether_type != TYPE_BROADCAST) {
-                    hdr.marquer[0].setValid();
-                    hdr.marquer[0].switch_id = local_metadata.switch_id;
-                    hdr.marquer[0].ether_type = hdr.ethernet.ether_type;
+                    hdr.marker[0].setValid();
+                    hdr.marker[0].switch_id = local_metadata.switch_id;
+                    hdr.marker[0].ether_type = hdr.ethernet.ether_type;
                     hdr.ethernet.ether_type = TYPE_BROADCAST;
-                    hdr.marquer[0].dst_addr = hdr.ethernet.dst_addr;
+                    hdr.marker[0].dst_addr = hdr.ethernet.dst_addr;
                 }
-                else if (hdr.marquer[0].ether_type != TYPE_BROADCAST) {
-                    hdr.marquer[1].setValid();
-                    hdr.marquer[1].switch_id = local_metadata.switch_id;
-                    hdr.marquer[1].ether_type = hdr.marquer[0].ether_type;
-                    hdr.marquer[0].ether_type = TYPE_BROADCAST;
+                else if (hdr.marker[0].ether_type != TYPE_BROADCAST) {
+                    hdr.marker[1].setValid();
+                    hdr.marker[1].switch_id = local_metadata.switch_id;
+                    hdr.marker[1].ether_type = hdr.marker[0].ether_type;
+                    hdr.marker[0].ether_type = TYPE_BROADCAST;
                 }
-                else if (hdr.marquer[1].ether_type != TYPE_BROADCAST) {
-                    hdr.marquer[2].setValid();
-                    hdr.marquer[2].switch_id = local_metadata.switch_id;
-                    hdr.marquer[2].ether_type = hdr.marquer[1].ether_type;
-                    hdr.marquer[1].ether_type = TYPE_BROADCAST;
+                else if (hdr.marker[1].ether_type != TYPE_BROADCAST) {
+                    hdr.marker[2].setValid();
+                    hdr.marker[2].switch_id = local_metadata.switch_id;
+                    hdr.marker[2].ether_type = hdr.marker[1].ether_type;
+                    hdr.marker[1].ether_type = TYPE_BROADCAST;
                 }
-                else if (hdr.marquer[2].ether_type != TYPE_BROADCAST) {
-                    hdr.marquer[3].setValid();
-                    hdr.marquer[3].switch_id = local_metadata.switch_id;
-                    hdr.marquer[3].ether_type = hdr.marquer[2].ether_type;
-                    hdr.marquer[2].ether_type = TYPE_BROADCAST;
+                else if (hdr.marker[2].ether_type != TYPE_BROADCAST) {
+                    hdr.marker[3].setValid();
+                    hdr.marker[3].switch_id = local_metadata.switch_id;
+                    hdr.marker[3].ether_type = hdr.marker[2].ether_type;
+                    hdr.marker[2].ether_type = TYPE_BROADCAST;
                 }
                 // Set the destination MAC to the broadcast address so the antenas 
                 // recieve the packets
@@ -392,25 +360,25 @@ control EgressPipeImpl (inout parsed_headers_t hdr,
             }
 
             // If the destination has been reached, put the ether_type in the 
-            // correct place and discard all marquers
+            // correct place and discard all markers
             if (hdr.ethernet.ether_type != TYPE_BROADCAST) {
             }
-            else if (hdr.marquer[0].ether_type != TYPE_BROADCAST) {
-                hdr.ethernet.ether_type = hdr.marquer[0].ether_type;
+            else if (hdr.marker[0].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marker[0].ether_type;
             }
-            else if (hdr.marquer[1].ether_type != TYPE_BROADCAST) {
-                hdr.ethernet.ether_type = hdr.marquer[1].ether_type;
+            else if (hdr.marker[1].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marker[1].ether_type;
             }
-            else if (hdr.marquer[2].ether_type != TYPE_BROADCAST) {
-                hdr.ethernet.ether_type = hdr.marquer[2].ether_type;
+            else if (hdr.marker[2].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marker[2].ether_type;
             }
-            else if (hdr.marquer[3].ether_type != TYPE_BROADCAST) {
-                hdr.ethernet.ether_type = hdr.marquer[3].ether_type;
+            else if (hdr.marker[3].ether_type != TYPE_BROADCAST) {
+                hdr.ethernet.ether_type = hdr.marker[3].ether_type;
             }
-            hdr.marquer[0].setInvalid();
-            hdr.marquer[1].setInvalid();
-            hdr.marquer[2].setInvalid();
-            hdr.marquer[3].setInvalid();
+            hdr.marker[0].setInvalid();
+            hdr.marker[1].setInvalid();
+            hdr.marker[2].setInvalid();
+            hdr.marker[3].setInvalid();
         }
 
 
@@ -427,7 +395,7 @@ control DeparserImpl(packet_out packet, in parsed_headers_t hdr) {
     apply {
         packet.emit(hdr.cpu_in);
         packet.emit(hdr.ethernet);
-        packet.emit(hdr.marquer);
+        packet.emit(hdr.marker);
     }
 }
 
