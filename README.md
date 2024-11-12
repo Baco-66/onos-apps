@@ -66,8 +66,6 @@ Before running this application, ensure the following dependencies are installed
 
 After completing these steps, ONOS should detect and manage the devices defined in the configuration file. Three registered `pipeconfigs` should be visible, indicating that ONOS has correctly activated the required applications.
 
----
-
 ## Credits
 
 This project was initially forked from the [NGSDN Tutorial - Advanced](https://github.com/opennetworkinglab/ngsdn-tutorial/tree/advanced) repository. I would like to thank the Open Networking Lab for their work and contribution to this project.
